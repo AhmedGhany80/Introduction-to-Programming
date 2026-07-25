@@ -177,25 +177,6 @@
         // ==== إعدادات إرسال النتيجة على تيليجرام ====
         const TELEGRAM_BOT_TOKEN = "8007107852:AAGpK8K1Tnz73Jfbh2twXLyOhZaKOC3TRE8";
         const TELEGRAM_CHAT_ID = "1407331798";
-        const RESULT_SENT_KEY = "examResultSent_python_basics_v1"; // مفتاح يمنع الإرسال المتكرر لنفس الجهاز
-
-        // === دوال آمنة للتعامل مع localStorage (بعض المتصفحات/الـ iframes بتمنعها وترمي خطأ) ===
-        function safeGetLocal(key) {
-            try {
-                return localStorage.getItem(key);
-            } catch (e) {
-                console.warn("localStorage غير متاح (get):", e);
-                return null;
-            }
-        }
-        function safeSetLocal(key, value) {
-            try {
-                localStorage.setItem(key, value);
-            } catch (e) {
-                console.warn("localStorage غير متاح (set):", e);
-            }
-        }
-
         async function sendResultToTelegram({ studentName, score, total, percentage, answers, questionsData }) {
             try {
                 const gradeLabel = percentage >= 80 ? "امتياز" : (percentage >= 60 ? "جيد جدا" : "ضعيف - يحتاج مراجعة");
@@ -485,30 +466,29 @@ rationale:"التفكير المنطقي هو أساس حل المشكلات ا�
             const finishExam = () => {
                 setIsFinished(true);
 
-                // نبعت النتيجة أول مرة بس (لهذا الجهاز/المتصفح) - باستخدام دوال آمنة لـ localStorage
-                const alreadySent = resultSentRef.current || safeGetLocal(RESULT_SENT_KEY);
-                if (!alreadySent) {
-                    resultSentRef.current = true;
-                    safeSetLocal(RESULT_SENT_KEY, "1");
-
-                    let score = 0;
-                    questionsData.forEach((q, idx) => {
-                        if (answers[idx] === q.correctIndex) score++;
-                    });
-                    const percentage = (score / questionsData.length) * 100;
-
-                    // الإرسال بيحصل دايمًا حتى لو localStorage فشل فوق
-                    sendResultToTelegram({
-                        studentName,
-                        score,
-                        total: questionsData.length,
-                        percentage,
-                        answers,
-                        questionsData
-                    });
-                } else {
-                    console.log("تم تخطي الإرسال: النتيجة اتبعتت قبل كده من نفس الجهاز.");
+                // نبعت النتيجة في كل محاولة (مش مربوطة بالجهاز/localStorage خالص).
+                // resultSentRef هنا بس بيمنع نداء مزدوج لنفس المحاولة (مثلاً لو انتهاء الوقت
+                // وزرار "إنهاء الامتحان" حصلوا في نفس اللحظة بالظبط).
+                if (resultSentRef.current) {
+                    console.log("تم تخطي الإرسال: النتيجة اتبعتت بالفعل لنفس المحاولة الحالية.");
+                    return;
                 }
+                resultSentRef.current = true;
+
+                let score = 0;
+                questionsData.forEach((q, idx) => {
+                    if (answers[idx] === q.correctIndex) score++;
+                });
+                const percentage = (score / questionsData.length) * 100;
+
+                sendResultToTelegram({
+                    studentName,
+                    score,
+                    total: questionsData.length,
+                    percentage,
+                    answers,
+                    questionsData
+                });
             };
 
             const scoreData = useMemo(() => {
