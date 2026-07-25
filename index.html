@@ -179,6 +179,23 @@
         const TELEGRAM_CHAT_ID = "1407331798";
         const RESULT_SENT_KEY = "examResultSent_python_basics_v1"; // مفتاح يمنع الإرسال المتكرر لنفس الجهاز
 
+        // === دوال آمنة للتعامل مع localStorage (بعض المتصفحات/الـ iframes بتمنعها وترمي خطأ) ===
+        function safeGetLocal(key) {
+            try {
+                return localStorage.getItem(key);
+            } catch (e) {
+                console.warn("localStorage غير متاح (get):", e);
+                return null;
+            }
+        }
+        function safeSetLocal(key, value) {
+            try {
+                localStorage.setItem(key, value);
+            } catch (e) {
+                console.warn("localStorage غير متاح (set):", e);
+            }
+        }
+
         async function sendResultToTelegram({ studentName, score, total, percentage, answers, questionsData }) {
             try {
                 const gradeLabel = percentage >= 80 ? "امتياز" : (percentage >= 60 ? "جيد جدا" : "ضعيف - يحتاج مراجعة");
@@ -199,7 +216,9 @@
                     text += `🌟 إجابة كل الأسئلة صح!\n`;
                 }
 
-                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                console.log("جاري إرسال النتيجة إلى تيليجرام...", text);
+
+                const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -207,8 +226,16 @@
                         text: text
                     })
                 });
+
+                const data = await res.json();
+                if (!data.ok) {
+                    // بيبان هنا لو فيه مشكلة حقيقية زي: chat not found / bot blocked / token غلط
+                    console.error("تيليجرام رفض الرسالة:", data);
+                } else {
+                    console.log("تم إرسال النتيجة بنجاح ✅");
+                }
             } catch (err) {
-                console.error("تعذر إرسال النتيجة إلى تيليجرام:", err);
+                console.error("تعذر إرسال النتيجة إلى تيليجرام (خطأ شبكة/CORS):", err);
             }
         }
 
@@ -458,11 +485,11 @@ rationale:"التفكير المنطقي هو أساس حل المشكلات ا�
             const finishExam = () => {
                 setIsFinished(true);
 
-                // نبعت النتيجة أول مرة بس (لهذا الجهاز/المتصفح)
-                const alreadySent = resultSentRef.current || localStorage.getItem(RESULT_SENT_KEY);
+                // نبعت النتيجة أول مرة بس (لهذا الجهاز/المتصفح) - باستخدام دوال آمنة لـ localStorage
+                const alreadySent = resultSentRef.current || safeGetLocal(RESULT_SENT_KEY);
                 if (!alreadySent) {
                     resultSentRef.current = true;
-                    localStorage.setItem(RESULT_SENT_KEY, "1");
+                    safeSetLocal(RESULT_SENT_KEY, "1");
 
                     let score = 0;
                     questionsData.forEach((q, idx) => {
@@ -470,6 +497,7 @@ rationale:"التفكير المنطقي هو أساس حل المشكلات ا�
                     });
                     const percentage = (score / questionsData.length) * 100;
 
+                    // الإرسال بيحصل دايمًا حتى لو localStorage فشل فوق
                     sendResultToTelegram({
                         studentName,
                         score,
@@ -478,6 +506,8 @@ rationale:"التفكير المنطقي هو أساس حل المشكلات ا�
                         answers,
                         questionsData
                     });
+                } else {
+                    console.log("تم تخطي الإرسال: النتيجة اتبعتت قبل كده من نفس الجهاز.");
                 }
             };
 
