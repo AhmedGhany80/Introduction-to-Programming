@@ -172,10 +172,47 @@
     <div id="root" class="h-full flex flex-col"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // ==== إعدادات إرسال النتيجة على تيليجرام ====
+        const TELEGRAM_BOT_TOKEN = "8007107852:AAGpK8K1Tnz73Jfbh2twXLyOhZaKOC3TRE8";
+        const TELEGRAM_CHAT_ID = "1407331798";
+        const RESULT_SENT_KEY = "examResultSent_python_basics_v1"; // مفتاح يمنع الإرسال المتكرر لنفس الجهاز
+
+        async function sendResultToTelegram({ studentName, score, total, percentage, answers, questionsData }) {
+            try {
+                const gradeLabel = percentage >= 80 ? "امتياز" : (percentage >= 60 ? "جيد جدا" : "ضعيف - يحتاج مراجعة");
+
+                const wrongList = questionsData
+                    .map((q, idx) => ({ q, idx, given: answers[idx] }))
+                    .filter(item => item.given !== item.q.correctIndex)
+                    .map(item => `س${item.idx + 1}`)
+                    .join("، ");
+
+                let text = `📝 نتيجة اختبار أساسيات البرمجة\n`;
+                text += `👤 الطالب: ${studentName || "غير مسجل"}\n`;
+                text += `✅ الدرجة: ${score} / ${total} (${percentage.toFixed(0)}%)\n`;
+                text += `🏷️ التقييم: ${gradeLabel}\n`;
+                if (wrongList) {
+                    text += `❌ الأسئلة الخاطئة: ${wrongList}\n`;
+                } else {
+                    text += `🌟 إجابة كل الأسئلة صح!\n`;
+                }
+
+                await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        chat_id: TELEGRAM_CHAT_ID,
+                        text: text
+                    })
+                });
+            } catch (err) {
+                console.error("تعذر إرسال النتيجة إلى تيليجرام:", err);
+            }
+        }
 
        const questionsData = [
-
 {
 id:1,
 question:"ما هو الكمبيوتر؟",
@@ -191,19 +228,6 @@ rationale:"الكمبيوتر هو جهاز إلكتروني يستقبل الب
 
 {
 id:2,
-question:"أي مما يلي يعتبر من وحدات الإدخال؟",
-options:[
-"الشاشة",
-"الطابعة",
-"لوحة المفاتيح",
-"السماعات"
-],
-correctIndex:2,
-rationale:"لوحة المفاتيح تستخدم لإدخال البيانات إلى الكمبيوتر."
-},
-
-{
-id:3,
 question:"أي جزء يعتبر عقل الكمبيوتر؟",
 options:[
 "RAM",
@@ -216,7 +240,7 @@ rationale:"المعالج CPU هو المسؤول عن تنفيذ جميع ال�
 },
 
 {
-id:4,
+id:3,
 question:"ما وظيفة RAM؟",
 options:[
 "تخزين دائم",
@@ -229,20 +253,7 @@ rationale:"RAM تخزن البيانات بشكل مؤقت أثناء تشغيل
 },
 
 {
-id:5,
-question:"أي وسيلة تخزين أسرع؟",
-options:[
-"HDD",
-"SSD",
-"DVD",
-"Flash CD"
-],
-correctIndex:1,
-rationale:"SSD أسرع كثيراً من HDD."
-},
-
-{
-id:6,
+id:4,
 question:"ما وظيفة نظام التشغيل؟",
 options:[
 "تشغيل وإدارة موارد الكمبيوتر",
@@ -253,53 +264,13 @@ options:[
 correctIndex:0,
 rationale:"نظام التشغيل هو المسؤول عن إدارة الجهاز بالكامل."
 },
-
 {
-id:7,
-question:"أي مما يلي يعد Hardware؟",
-options:[
-"Microsoft Word",
-"Windows",
-"لوحة المفاتيح",
-"Google Chrome"
-],
-correctIndex:2,
-rationale:"لوحة المفاتيح قطعة مادية."
-},
-
-{
-id:8,
-question:"أي مما يلي يعد Software؟",
-options:[
-"الشاشة",
-"الفأرة",
-"Windows",
-"الرام"
-],
-correctIndex:2,
-rationale:"Windows برنامج وليس قطعة مادية."
-},
-
-{
-id:9,
-question:"أي من التالي يعتبر جهاز إخراج؟",
-options:[
-"Keyboard",
-"Scanner",
-"Printer",
-"Mouse"
-],
-correctIndex:2,
-rationale:"الطابعة من أجهزة الإخراج."
-},
-
-{
-id:10,
+id:5,
 question:"البيانات داخل الكمبيوتر يتم تمثيلها باستخدام؟",
 options:[
 "الحروف",
 "الأرقام فقط",
-"النظام الثنائي Binary",
+"(0,1)النظام الثنائي Binary",
 "الرموز"
 ],
 correctIndex:2,
@@ -307,7 +278,7 @@ rationale:"كل البيانات داخل الكمبيوتر تتحول إلى 0
 },
 
 {
-id:11,
+id:6,
 question:"ماذا يمثل الرقمان 0 و1 داخل الكمبيوتر؟",
 options:[
 "لغة الآلة",
@@ -318,9 +289,8 @@ options:[
 correctIndex:0,
 rationale:"الكمبيوتر يفهم لغة الآلة المكونة من 0 و1."
 },
-
 {
-id:12,
+id:7,
 question:"أي من التالي مثال على برنامج Application؟",
 options:[
 "Windows",
@@ -333,7 +303,7 @@ rationale:"Microsoft Word من البرامج التطبيقية."
 },
 
 {
-id:13,
+id:8,
 question:"أي مما يلي يعتبر نظام تشغيل؟",
 options:[
 "Excel",
@@ -346,7 +316,7 @@ rationale:"Windows هو أشهر أنظمة التشغيل."
 },
 
 {
-id:14,
+id:9,
 question:"ما هو الهدف الأساسي من البرمجة؟",
 options:[
 "تصميم الصور",
@@ -357,9 +327,8 @@ options:[
 correctIndex:1,
 rationale:"البرمجة هي كتابة تعليمات للكمبيوتر."
 },
-
 {
-id:15,
+id:10,
 question:"ما هي الخوارزمية Algorithm؟",
 options:[
 "برنامج مضاد للفيروسات",
@@ -369,7 +338,70 @@ options:[
 ],
 correctIndex:2,
 rationale:"الخوارزمية هي خطوات منطقية لحل مشكلة معينة."
-}
+},
+{
+id:11,
+question:"ما أفضل طريقة لتعلم البرمجة؟",
+options:[
+"حفظ الأكواد كما هي",
+"التطبيق العملي بعد كل درس",
+"مشاهدة الفيديوهات فقط",
+"شراء جهاز أقوى"
+],
+correctIndex:1,
+rationale:"التطبيق العملي هو أسرع وأفضل وسيلة لاكتساب مهارة البرمجة."
+},
+
+{
+id:12,
+question:"أي من التالي يعتبر مثالًا على استخدام الذكاء الاصطناعي؟",
+options:[
+"التعرف على الوجوه",
+"كتابة مستند Word",
+"تشغيل الآلة الحاسبة",
+"نسخ الملفات"
+],
+correctIndex:0,
+rationale:"التعرف على الوجوه من أشهر تطبيقات الذكاء الاصطناعي."
+},
+
+{
+id:13,
+question:"من المسؤول عن كتابة التعليمات التي ينفذها الكمبيوتر؟",
+options:[
+"نظام التشغيل",
+"المبرمج",
+"المتصفح",
+"المعالج"
+],
+correctIndex:1,
+rationale:"المبرمج هو من يكتب الأوامر باستخدام لغة برمجة."
+},
+
+{
+id:14,
+question:"ما الهدف من تعلم التفكير البرمجي؟",
+options:[
+"حفظ الأكواد",
+"حل المشكلات بطريقة منظمة",
+"استخدام الإنترنت",
+"شراء أجهزة حديثة"
+],
+correctIndex:1,
+rationale:"البرمجة تعتمد على التفكير المنطقي وتحليل المشكلات."
+},
+{
+id:15,
+question:"أي من التالي يعتبر مهارة يجب أن يمتلكها المبرمج؟",
+options:[
+"التفكير المنطقي",
+"الرسم الاحترافي",
+"التصوير",
+"الكتابة السريعة فقط"
+],
+correctIndex:0,
+rationale:"التفكير المنطقي هو أساس حل المشكلات البرمجية."
+},
 
 ];
 
@@ -377,11 +409,14 @@ rationale:"الخوارزمية هي خطوات منطقية لحل مشكلة �
         function App() {
             // New State for Game Flow
             const [hasStarted, setHasStarted] = useState(false);
-            
+            const [studentName, setStudentName] = useState("");
+            const [nameError, setNameError] = useState(false);
+            const resultSentRef = useRef(false);
+
             const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
             const [answers, setAnswers] = useState({});
             const [flagged, setFlagged] = useState({});
-            const [timeLeft, setTimeLeft] = useState(10 * 60);
+            const [timeLeft, setTimeLeft] = useState(15 * 60);
             const [isFinished, setIsFinished] = useState(false);
 
             // Timer Logic - Starts only if hasStarted is true
@@ -422,6 +457,28 @@ rationale:"الخوارزمية هي خطوات منطقية لحل مشكلة �
 
             const finishExam = () => {
                 setIsFinished(true);
+
+                // نبعت النتيجة أول مرة بس (لهذا الجهاز/المتصفح)
+                const alreadySent = resultSentRef.current || localStorage.getItem(RESULT_SENT_KEY);
+                if (!alreadySent) {
+                    resultSentRef.current = true;
+                    localStorage.setItem(RESULT_SENT_KEY, "1");
+
+                    let score = 0;
+                    questionsData.forEach((q, idx) => {
+                        if (answers[idx] === q.correctIndex) score++;
+                    });
+                    const percentage = (score / questionsData.length) * 100;
+
+                    sendResultToTelegram({
+                        studentName,
+                        score,
+                        total: questionsData.length,
+                        percentage,
+                        answers,
+                        questionsData
+                    });
+                }
             };
 
             const scoreData = useMemo(() => {
@@ -453,25 +510,45 @@ rationale:"الخوارزمية هي خطوات منطقية لحل مشكلة �
                                     اختبار أساسيات البرمجة
                                 </h1>
                                 <p className="text-xl text-gray-600 font-medium">
-                                    اختبار المحاضرة التأسيسية
+                                  اختبار المحاضرة الأولي
                                 </p>
                             </div>
 
                             <div className="space-y-6">
-                                <div className="flex justify-center gap-8 text-gray-600 mb-8">
+                                <div className="flex justify-center gap-8 text-gray-600 mb-4">
                                     <div className="flex flex-col items-center">
                                         <span className="font-bold text-lg text-gray-800">{questionsData.length}</span>
                                         <span className="text-sm">سؤال</span>
                                     </div>
                                     <div className="w-px bg-gray-300"></div>
                                     <div className="flex flex-col items-center">
-                                        <span className="font-bold text-lg text-gray-800">10</span>
+                                        <span className="font-bold text-lg text-gray-800">15</span>
                                         <span className="text-sm">دقيقة</span>
                                     </div>
                                 </div>
 
+                                <div className="text-right max-w-xs mx-auto">
+                                    <label className="block text-gray-600 font-bold mb-2 text-sm">اكتب اسمك قبل البدء</label>
+                                    <input
+                                        type="text"
+                                        value={studentName}
+                                        onChange={(e) => { setStudentName(e.target.value); if (nameError) setNameError(false); }}
+                                        placeholder="الاسم بالكامل"
+                                        className={`w-full p-3 rounded-lg border-2 text-lg focus:outline-none transition ${nameError ? 'border-red-400' : 'border-gray-200 focus:border-[#0056b3]'}`}
+                                    />
+                                    {nameError && (
+                                        <p className="text-red-500 text-sm mt-1">من فضلك اكتب اسمك أولاً</p>
+                                    )}
+                                </div>
+
                                 <button 
-                                    onClick={() => setHasStarted(true)}
+                                    onClick={() => {
+                                        if (!studentName.trim()) {
+                                            setNameError(true);
+                                            return;
+                                        }
+                                        setHasStarted(true);
+                                    }}
                                     className="btn-pulse bg-[#0056b3] text-white text-2xl font-bold py-4 px-16 rounded-full hover:bg-blue-700 transition transform hover:scale-105 shadow-xl w-full md:w-auto"
                                 >
                                     ابــدأ الآن
@@ -503,7 +580,10 @@ rationale:"الخوارزمية هي خطوات منطقية لحل مشكلة �
                 return (
                     <div className="flex flex-col items-center justify-center h-full bg-gray-50 p-6 animate-fade-in overflow-y-auto">
                         <div className="bg-white p-8 rounded-lg shadow-xl text-center max-w-2xl w-full border-t-8 border-[#0056b3] my-6">
-                            <h1 className="text-4xl font-bold mb-4 text-[#0056b3]">نتيجة الاختبار</h1>
+                            <h1 className="text-4xl font-bold mb-1 text-[#0056b3]">نتيجة الاختبار</h1>
+                            {studentName && (
+                                <p className="text-gray-500 font-semibold mb-4">{studentName}</p>
+                            )}
                             <div className="text-6xl font-bold mb-6 text-gray-800">
                                 {scoreData.score} / {questionsData.length}
                             </div>
@@ -557,7 +637,7 @@ rationale:"الخوارزمية هي خطوات منطقية لحل مشكلة �
                     <header className="flex justify-between items-center p-4 shadow-sm border-b bg-white z-10 h-16">
                         <div className="flex items-center gap-4">
                             <div className="bg-[#0056b3] text-white font-bold px-3 py-1 rounded text-sm">
-                                اختبار أساسيات البرمجة
+                               اختبار المحاضرة الاولي
                             </div>
                             <div className="font-bold text-gray-700 hidden sm:block">م/ أحمد عبدالغني</div>
                         </div>
